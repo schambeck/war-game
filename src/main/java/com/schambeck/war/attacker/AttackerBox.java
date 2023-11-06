@@ -12,6 +12,7 @@ import javafx.scene.shape.CubicCurveTo;
 import javafx.scene.shape.MoveTo;
 import javafx.scene.shape.Path;
 import javafx.util.Duration;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -23,6 +24,7 @@ import static javafx.scene.paint.Color.*;
 @Slf4j
 public class AttackerBox extends Box {
     private final Consumer<Node> consumer;
+    @Getter
     private final Integer reference;
     private final AtomicInteger attackerGunIdGenerator;
     
@@ -98,7 +100,4 @@ public class AttackerBox extends Box {
         return translateTarget >= minMargin && translateTarget <= maxMargin;
     }
     
-    public Integer getReference() {
-        return reference;
-    }
 }
