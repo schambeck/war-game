@@ -9,6 +9,7 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -24,6 +25,7 @@ import static javafx.util.Duration.millis;
 public class DefenderBox extends Box {
     private final Consumer<Node> consumer;
     private final List<GunAttacker> movingGuns;
+    @Getter
     private final Integer reference;
     private final AtomicInteger defenderGunIdGenerator;
     
@@ -109,9 +111,5 @@ public class DefenderBox extends Box {
         double minMargin = translateGun - 5;
         double maxMargin = translateGun + 5;
         return translateDefenderGun >= minMargin && translateDefenderGun <= maxMargin;
-    }
-    
-    public Integer getReference() {
-        return reference;
     }
 }
