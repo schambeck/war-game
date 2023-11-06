@@ -74,7 +74,6 @@ public class WarApp extends Application {
     double mouseDeltaY;
     private Label buildingsLabel;
     private Label gunsLabel;
-    private LightBase light;
     private Image buildingMap = new Image("image/building.jpg");
     private Image tankMap = new Image("image/tank.jpg");
     private Image defenderMap = new Image("image/defender.jpg");
@@ -129,6 +128,7 @@ public class WarApp extends Application {
     }
     
     private void buildLight() {
+        LightBase light;
         light = new PointLight(WHITE);
         light.setTranslateX(0);
         light.setTranslateY(-600);
