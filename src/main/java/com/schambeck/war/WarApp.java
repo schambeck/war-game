@@ -123,8 +123,8 @@ public class WarApp extends Application {
         camera.setTranslateX(-700);
         camera.setTranslateY(-450);
         camera.setTranslateZ(CAMERA_INITIAL_DISTANCE);
-        cameraXform.ry.setAngle(CAMERA_INITIAL_Y_ANGLE);
-        cameraXform.rx.setAngle(CAMERA_INITIAL_X_ANGLE);
+        cameraXform.getRy().setAngle(CAMERA_INITIAL_Y_ANGLE);
+        cameraXform.getRx().setAngle(CAMERA_INITIAL_X_ANGLE);
     }
     
     private void buildLight() {
@@ -338,11 +338,11 @@ public class WarApp extends Application {
         scene.setOnKeyPressed(event -> {
             switch (event.getCode()) {
                 case Z:
-                    cameraXform2.t.setX(0.0);
-                    cameraXform2.t.setY(0.0);
+                    cameraXform2.getT().setX(0.0);
+                    cameraXform2.getT().setY(0.0);
                     camera.setTranslateZ(CAMERA_INITIAL_DISTANCE);
-                    cameraXform.ry.setAngle(CAMERA_INITIAL_Y_ANGLE);
-                    cameraXform.rx.setAngle(CAMERA_INITIAL_X_ANGLE);
+                    cameraXform.getRy().setAngle(CAMERA_INITIAL_Y_ANGLE);
+                    cameraXform.getRx().setAngle(CAMERA_INITIAL_X_ANGLE);
                     break;
                 case X:
                     axisGroup.setVisible(!axisGroup.isVisible());
@@ -404,8 +404,8 @@ public class WarApp extends Application {
                 modifier = SHIFT_MULTIPLIER;
             }
             if (me.isPrimaryButtonDown()) {
-                cameraXform.ry.setAngle(cameraXform.ry.getAngle() - mouseDeltaX*MOUSE_SPEED*modifier*ROTATION_SPEED);
-                cameraXform.rx.setAngle(cameraXform.rx.getAngle() + mouseDeltaY*MOUSE_SPEED*modifier*ROTATION_SPEED);
+                cameraXform.getRy().setAngle(cameraXform.getRy().getAngle() - mouseDeltaX*MOUSE_SPEED*modifier*ROTATION_SPEED);
+                cameraXform.getRx().setAngle(cameraXform.getRx().getAngle() + mouseDeltaY*MOUSE_SPEED*modifier*ROTATION_SPEED);
             }
             else if (me.isSecondaryButtonDown()) {
                 double z = camera.getTranslateZ();
@@ -413,8 +413,8 @@ public class WarApp extends Application {
                 camera.setTranslateZ(newZ);
             }
             else if (me.isMiddleButtonDown()) {
-                cameraXform2.t.setX(cameraXform2.t.getX() + mouseDeltaX*MOUSE_SPEED*modifier*TRACK_SPEED);
-                cameraXform2.t.setY(cameraXform2.t.getY() + mouseDeltaY*MOUSE_SPEED*modifier*TRACK_SPEED);
+                cameraXform2.getT().setX(cameraXform2.getT().getX() + mouseDeltaX*MOUSE_SPEED*modifier*TRACK_SPEED);
+                cameraXform2.getT().setY(cameraXform2.getT().getY() + mouseDeltaY*MOUSE_SPEED*modifier*TRACK_SPEED);
             }
         });
     }
