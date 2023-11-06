@@ -8,15 +8,15 @@ import lombok.Getter;
 
 public class Xform extends Group {
     @Getter
-    private Translate t  = new Translate();
-    private Translate p  = new Translate();
-    private Translate ip = new Translate();
+    private final Translate t  = new Translate();
+    private final Translate p  = new Translate();
+    private final Translate ip = new Translate();
     @Getter
-    private Rotate rx = new Rotate();
+    private final Rotate rx = new Rotate();
     @Getter
-    private Rotate ry = new Rotate();
-    private Rotate rz = new Rotate();
-    private Scale s = new Scale();
+    private final Rotate ry = new Rotate();
+    private final Rotate rz = new Rotate();
+    private final Scale s = new Scale();
 
     public Xform() {
         super();
