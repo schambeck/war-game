@@ -22,10 +22,10 @@ import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -64,7 +64,7 @@ public class WarApp extends Application {
     private static final double MOUSE_SPEED = 0.1;
     private static final double ROTATION_SPEED = 2.0;
     private static final double TRACK_SPEED = 0.3;
-    private final Random random = new Random();
+    private final SecureRandom random = new SecureRandom();
     
     double mousePosX;
     double mousePosY;
