@@ -202,21 +202,37 @@ public class WarApp extends Application {
         defender.setTranslateX((((defendersGround.getWidth() / 2) - (defender.getWidth() * 4)) * -1) + 20);
         defender.setTranslateY(((defendersGround.getHeight() / 2) + (defender.getHeight() / 2)) * -1);
         defender.setTranslateZ((defendersGround.getDepth() / 2 * -1) + (defendersGround.getDepth() / (count + 1) * (defenders.size() + 1)));
-        Label label = new Label("Defender #" + defender.getReference());
-        label.setTranslateX((defender.getTranslateX()));
-        label.setTranslateY((defender.getTranslateY() - defender.getHeight() - 10));
-        label.setTranslateZ((defender.getTranslateZ()));
-        label.setVisible(false);
-        defender.setOnMouseEntered(event -> {
-            defender.setMaterial(selectedMaterial);
-            label.setVisible(true);
-        });
-        defender.setOnMouseExited(event -> {
-            defender.setMaterial(magentaMaterial);
-            label.setVisible(false);
-        });
+        Label label = createDefenderLabel("Defender", defender, selectedMaterial, magentaMaterial, defender.getReference());
         defenders.add(defender);
         world.getChildren().addAll(defender, label);
+    }
+    
+    private <T extends Box> Label createDefenderLabel(String prefix, T box, PhongMaterial selectedMaterial, PhongMaterial magentaMaterial, Integer reference) {
+        Label label = new Label(prefix + " #" + reference);
+        label.setTranslateX((box.getTranslateX()));
+        label.setTranslateY((box.getTranslateY() - box.getHeight() - 10));
+        return createLabel(label, box, selectedMaterial, magentaMaterial);
+    }
+
+    private <T extends Box> Label createAttackerLabel(String prefix, T box, PhongMaterial selectedMaterial, PhongMaterial magentaMaterial, Integer reference) {
+        Label label = new Label(prefix + " #" + reference);
+        label.setTranslateX((box.getTranslateX() - 10));
+        label.setTranslateY((box.getTranslateY() - box.getLayoutBounds().getHeight() - 10));
+        return createLabel(label, box, selectedMaterial, magentaMaterial);
+    }
+
+    private <T extends Box> Label createLabel(Label label, T box, PhongMaterial selectedMaterial, PhongMaterial magentaMaterial) {
+        label.setTranslateZ((box.getTranslateZ()));
+        label.setVisible(false);
+        box.setOnMouseEntered(event -> {
+            box.setMaterial(selectedMaterial);
+            label.setVisible(true);
+        });
+        box.setOnMouseExited(event -> {
+            box.setMaterial(magentaMaterial);
+            label.setVisible(false);
+        });
+        return label;
     }
     
     private void addBuildings(int count, int rows) {
@@ -234,19 +250,7 @@ public class WarApp extends Application {
         building.setTranslateX(((defendersGround.getWidth() / 2) - (building.getWidth() * 2 * (row + 1))) * -1);
         building.setTranslateY(((defendersGround.getHeight() / 2) + (building.getHeight() / 2)) * -1);
         building.setTranslateZ((defendersGround.getDepth() / 2 * -1) + (defendersGround.getDepth() / (count + 1) * (item + 1)));
-        Label label = new Label("Building #" + building.getReference());
-        label.setTranslateX((building.getTranslateX()));
-        label.setTranslateY((building.getTranslateY() - building.getHeight() - 10));
-        label.setTranslateZ((building.getTranslateZ()));
-        label.setVisible(false);
-        building.setOnMouseEntered(event -> {
-            building.setMaterial(selectedMaterial);
-            label.setVisible(true);
-        });
-        building.setOnMouseExited(event -> {
-            building.setMaterial(grayMaterial);
-            label.setVisible(false);
-        });
+        Label label = createDefenderLabel("Building", building, selectedMaterial, grayMaterial, building.getReference());
         buildings.add(building);
         untouchedBuildings.add(building);
         world.getChildren().addAll(building, label);
@@ -268,19 +272,7 @@ public class WarApp extends Application {
         attacker.setTranslateY(((defendersGround.getHeight() / 2) + (attacker.getHeight() / 2)) * -1);
         attacker.setTranslateZ((defendersGround.getDepth() / 2 * -1) + (defendersGround.getDepth() / (count + 1) * (attackers.size() + 1)));
         attackers.add(attacker);
-        Label label = new Label("Attacker #" + attacker.getReference());
-        label.setTranslateX((attacker.getTranslateX() - 10));
-        label.setTranslateY((attacker.getTranslateY() - attacker.getLayoutBounds().getHeight() - 10));
-        label.setTranslateZ((attacker.getTranslateZ()));
-        label.setVisible(false);
-        attacker.setOnMouseEntered(event -> {
-            attacker.setMaterial(selectedMaterial);
-            label.setVisible(true);
-        });
-        attacker.setOnMouseExited(event -> {
-            attacker.setMaterial(redMaterial);
-            label.setVisible(false);
-        });
+        Label label = createAttackerLabel("Attacker", attacker, selectedMaterial, redMaterial, attacker.getReference());
         world.getChildren().addAll(attacker, label);
     }
     
