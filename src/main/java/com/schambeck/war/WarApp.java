@@ -74,11 +74,11 @@ public class WarApp extends Application {
     double mouseDeltaY;
     private Label buildingsLabel;
     private Label gunsLabel;
-    private Image buildingMap = new Image("image/building.jpg");
-    private Image tankMap = new Image("image/tank.jpg");
-    private Image defenderMap = new Image("image/defender.jpg");
-    private Image grassMap = new Image("image/grass.jpg");
-    private Image sandMap = new Image("image/sand.jpg");
+    private final Image buildingMap = new Image("image/building.jpg");
+    private final Image tankMap = new Image("image/tank.jpg");
+    private final Image defenderMap = new Image("image/defender.jpg");
+    private final Image grassMap = new Image("image/grass.jpg");
+    private final Image sandMap = new Image("image/sand.jpg");
     
     @Override
     public void start(Stage stage) {
