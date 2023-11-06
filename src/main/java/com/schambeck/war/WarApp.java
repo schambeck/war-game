@@ -351,13 +351,15 @@ public class WarApp extends Application {
                     defendersGround.setVisible(!defendersGround.isVisible());
                     break;
                 case R:
-                    defendersGround.setRotate(defendersGround.getRotate() + 1);
+                    world.setRotate(world.getRotate() + 1);
                     break;
                 case P:
                     play();
                     break;
                 case UP:
                     if (event.isShiftDown()) {
+                        cameraXform.getRx().setAngle(cameraXform.getRx().getAngle() - 10);
+                    } else if (event.isControlDown()) {
                         camera.setTranslateZ(camera.getTranslateZ() + 10);
                     } else {
                         camera.setTranslateY(camera.getTranslateY() - 10);
@@ -365,16 +367,26 @@ public class WarApp extends Application {
                     break;
                 case DOWN:
                     if (event.isShiftDown()) {
-                        camera.setTranslateZ(camera.getTranslateZ() - 10);
+                        cameraXform.getRx().setAngle(cameraXform.getRx().getAngle() + 10);
+                    } else if (event.isControlDown()) {
+                        camera.setTranslateZ(camera.getTranslateY() + 10);
                     } else {
                         camera.setTranslateY(camera.getTranslateY() + 10);
                     }
                     break;
                 case LEFT:
-                    camera.setTranslateX(camera.getTranslateX() - 10);
+                    if (event.isShiftDown()) {
+                        cameraXform.getRy().setAngle(cameraXform.getRy().getAngle() + 10);
+                    } else {
+                        camera.setTranslateX(camera.getTranslateX() - 10);
+                    }
                     break;
                 case RIGHT:
-                    camera.setTranslateX(camera.getTranslateX() + 10);
+                    if (event.isShiftDown()) {
+                        cameraXform.getRy().setAngle(cameraXform.getRy().getAngle() - 10);
+                    } else {
+                        camera.setTranslateX(camera.getTranslateX() + 10);
+                    }
                     break;
             }
         });
