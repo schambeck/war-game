@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -317,7 +318,7 @@ public class WarApp extends Application {
     private void playShootSong() {
         String song = "song/missile-firing.wav";
         log.debug("Playing shoot: " + song);
-        String externalForm = getClass().getClassLoader().getResource(song).toExternalForm();
+        String externalForm = Objects.requireNonNull(getClass().getClassLoader().getResource(song)).toExternalForm();
         Media hit = new Media(externalForm);
         MediaPlayer mediaPlayer = new MediaPlayer(hit);
         mediaPlayer.play();
