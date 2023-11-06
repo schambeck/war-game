@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -57,7 +58,7 @@ public class DefenderBox extends Box {
     private void playExplosionSong() {
         String song = "song/explosion.wav";
         log.debug("Playing explosion: " + song);
-        String externalForm = getClass().getClassLoader().getResource(song).toExternalForm();
+        String externalForm = Objects.requireNonNull(getClass().getClassLoader().getResource(song)).toExternalForm();
         Media hit = new Media(externalForm);
         MediaPlayer mediaPlayer = new MediaPlayer(hit);
         mediaPlayer.play();
