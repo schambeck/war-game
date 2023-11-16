@@ -1,10 +1,12 @@
 package com.schambeck.war.attacker;
 
+import com.schambeck.war.CameraView;
 import com.schambeck.war.building.BuildingBox;
 import com.schambeck.war.core.Xform;
 import javafx.animation.ParallelTransition;
 import javafx.animation.PathTransition;
 import javafx.animation.TranslateTransition;
+import javafx.scene.Camera;
 import javafx.scene.Node;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
@@ -35,19 +37,36 @@ public class AttackerBox extends Box {
         this.attackerGunIdGenerator = attackerGunIdGenerator;
     }
     
-    public GunAttacker shoot(Xform world, BuildingBox target, List<GunAttacker> guns, List<GunAttacker> movingGuns, List<BuildingBox> untouchedBuildings) {
+    public GunAttacker shoot(Xform world, BuildingBox target, List<GunAttacker> guns, List<GunAttacker> movingGuns, List<BuildingBox> untouchedBuildings, Camera camera, CameraView cameraView) {
         PhongMaterial grayMaterial = new PhongMaterial();
         grayMaterial.setDiffuseColor(DARKGOLDENROD);
         grayMaterial.setSpecularColor(YELLOW);
-        GunAttacker gun = new GunAttacker(4, 12, this, attackerGunIdGenerator.incrementAndGet());
-        log.debug("Shoot - Gun #" + gun.getReference() + " Building #" + target.getReference());
-        gun.setMaterial(grayMaterial);
-        gun.setTranslateX(getTranslateX());
-        gun.setTranslateY(-50);
-        gun.setRotate(90);
-        world.getChildren().addAll(gun);
-        animateGun(target, gun, guns, movingGuns, untouchedBuildings);
-        return gun;
+        GunAttacker gunAttacker = new GunAttacker(4, 12, this, attackerGunIdGenerator.incrementAndGet());
+        log.debug("Shoot Gun #" + gunAttacker.getReference() + " Building #" + target.getReference());
+        gunAttacker.setMaterial(grayMaterial);
+        gunAttacker.setTranslateX(getTranslateX());
+        gunAttacker.setTranslateY(-50);
+        gunAttacker.translateXProperty().addListener((observable, oldValue, newValue) -> consumer.accept(gunAttacker));
+        gunAttacker.translateYProperty().addListener((observable, oldValue, newValue) -> consumer.accept(gunAttacker));
+        gunAttacker.translateZProperty().addListener((observable, oldValue, newValue) -> consumer.accept(gunAttacker));
+        gunAttacker.rotateProperty().addListener((observable, oldValue, newValue) -> consumer.accept(gunAttacker));
+        
+        switch (cameraView) {
+            case DEFAULT_ATTACKER_GUN:
+                gunAttacker.translateXProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateX(newValue.doubleValue()));
+                gunAttacker.translateYProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateY(newValue.doubleValue()));
+                gunAttacker.translateZProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateZ(newValue.doubleValue() - 600));
+                break;
+            case ATTACKER_GUN:
+                gunAttacker.translateXProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateZ(-newValue.doubleValue() - 600));
+                gunAttacker.translateYProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateY(newValue.doubleValue()));
+                gunAttacker.translateZProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateX(newValue.doubleValue()));
+                break;
+        }
+        
+        world.getChildren().addAll(gunAttacker);
+        animateGun(target, gunAttacker, guns, movingGuns, untouchedBuildings);
+        return gunAttacker;
     }
     
     private void animateGun(BuildingBox building, GunAttacker gun, List<GunAttacker> guns, List<GunAttacker> movingGuns, List<BuildingBox> untouchedBuildings) {
@@ -73,9 +92,8 @@ public class AttackerBox extends Box {
         transition.play();
         transition.setOnFinished(event -> {
             movingGuns.remove(gun);
-            consumer.accept(this);
             if (hit(building, gun)) {
-                log.debug("Hit - Building #" + building.getReference() + " Gun #" + gun.getReference());
+                log.debug("Hit Building #" + building.getReference() + " Gun #" + gun.getReference());
                 untouchedBuildings.remove(building);
                 consumer.accept(this);
                 PhongMaterial material = new PhongMaterial();
@@ -83,8 +101,9 @@ public class AttackerBox extends Box {
                 material.setSpecularColor(ORANGE);
                 building.setMaterial(material);
             } else {
-                log.debug("Not Hit - Building #" + building.getReference() + " Gun #" + gun.getReference());
+                log.debug("Not Hit Building #" + building.getReference() + " Gun #" + gun.getReference());
             }
+            consumer.accept(this);
         });
     }
 

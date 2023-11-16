@@ -1,12 +1,13 @@
 package com.schambeck.war.defender;
 
+import com.schambeck.war.CameraView;
 import com.schambeck.war.attacker.GunAttacker;
 import com.schambeck.war.core.Xform;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.scene.Node;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
+import javafx.scene.PerspectiveCamera;
+import javafx.scene.media.AudioClip;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
 import lombok.Getter;
@@ -24,93 +25,116 @@ import static javafx.util.Duration.millis;
 
 @Slf4j
 public class DefenderBox extends Box {
+    private static final String SONG = "song/explosion.wav";
+    private static final String EXTERNAL_FORM = Objects.requireNonNull(DefenderBox.class.getClassLoader().getResource(SONG)).toExternalForm();
+    private static final AudioClip CLIP = new AudioClip(EXTERNAL_FORM);
     private final Consumer<Node> consumer;
+    private final Consumer<Node> onHit;
     private final List<GunAttacker> movingGuns;
     @Getter
     private final Integer reference;
     private final AtomicInteger defenderGunIdGenerator;
+    private final PerspectiveCamera camera;
+    private final List<GunDefender> gunDefenders;
     
-    public DefenderBox(double width, double height, double depth, Consumer<Node> consumer, List<GunAttacker> movingGuns, Integer reference, AtomicInteger defenderGunIdGenerator) {
+    public DefenderBox(double width, double height, double depth, Consumer<Node> consumer, Consumer<Node> onHit, List<GunAttacker> movingGuns, Integer reference, AtomicInteger defenderGunIdGenerator, PerspectiveCamera camera, List<GunDefender> gunDefenders) {
         super(width, height, depth);
         this.consumer = consumer;
+        this.onHit = onHit;
         this.movingGuns = movingGuns;
         this.reference = reference;
         this.defenderGunIdGenerator = defenderGunIdGenerator;
+        this.camera = camera;
+        this.gunDefenders = gunDefenders;
     }
     
-    public void defend(Xform world, GunAttacker gun) {
+    public void defend(Xform world, GunAttacker gunAttacker, CameraView cameraView) {
         PhongMaterial grayMaterial = new PhongMaterial();
         grayMaterial.setDiffuseColor(DARKVIOLET);
         grayMaterial.setSpecularColor(VIOLET);
-        GunDefender defenderGun = new GunDefender(4, 12, this, defenderGunIdGenerator.incrementAndGet());
-        defenderGun.setMaterial(grayMaterial);
-        defenderGun.setTranslateX(getTranslateX());
-        defenderGun.setTranslateY(getTranslateY());
-        defenderGun.setTranslateZ(getTranslateZ());
-        defenderGun.setRotate(90);
-        world.getChildren().addAll(defenderGun);
-        Timeline timeline = new Timeline(new KeyFrame(millis(3), event -> runTranslateTransition(world, gun, defenderGun)));
-        defenderGun.setTimeline(timeline);
+        GunDefender gunDefender = new GunDefender(4, 12, this, defenderGunIdGenerator.incrementAndGet());
+        gunDefender.setMaterial(grayMaterial);
+        gunDefender.setTranslateX(getTranslateX());
+        gunDefender.setTranslateY(getTranslateY());
+        gunDefender.setTranslateZ(getTranslateZ());
+        gunDefender.translateXProperty().addListener((observable, oldValue, newValue) -> consumer.accept(gunDefender));
+        gunDefender.translateYProperty().addListener((observable, oldValue, newValue) -> consumer.accept(gunDefender));
+        gunDefender.translateZProperty().addListener((observable, oldValue, newValue) -> consumer.accept(gunDefender));
+        
+        switch (cameraView) {
+            case DEFAULT_DEFENDER_GUN:
+                gunDefender.translateXProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateX(newValue.doubleValue()));
+                gunDefender.translateYProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateY(newValue.doubleValue()));
+                gunDefender.translateZProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateZ(newValue.doubleValue() - 600));
+                break;
+            case DEFENDER_GUN:
+                gunDefender.translateXProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateZ(newValue.doubleValue() - 200));
+                gunDefender.translateYProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateY(newValue.doubleValue()));
+                gunDefender.translateZProperty().addListener((observable, oldValue, newValue) -> camera.setTranslateX(-newValue.doubleValue()));
+                break;
+        }
+        
+        gunDefender.setRotate(90);
+        gunDefenders.add(gunDefender);
+        world.getChildren().addAll(gunDefender);
+        Timeline timeline = new Timeline(new KeyFrame(millis(3), event -> runTranslateTransition(world, gunAttacker, gunDefender)));
+        gunDefender.setTimeline(timeline);
         timeline.setCycleCount(INDEFINITE);
         timeline.play();
     }
     
     private void playExplosionSong() {
-        String song = "song/explosion.wav";
-        log.debug("Playing explosion: " + song);
-        String externalForm = Objects.requireNonNull(getClass().getClassLoader().getResource(song)).toExternalForm();
-        Media hit = new Media(externalForm);
-        MediaPlayer mediaPlayer = new MediaPlayer(hit);
-        mediaPlayer.play();
+        CLIP.play();
     }
     
-    private void runTranslateTransition(Xform world, GunAttacker gun, GunDefender defenderGun) {
-        if (gun.getTranslateX() >= gun.getAttacker().getTranslateX() - 70) {
+    private void runTranslateTransition(Xform world, GunAttacker gunAttacker, GunDefender gunDefender) {
+        if (gunAttacker.getTranslateX() >= gunAttacker.getAttacker().getTranslateX() - 70) {
             return;
         }
-        if (hit(gun, defenderGun)) {
-            log.debug("Intercepted - Gun #" + gun.getReference() + " Attacker #" + gun.getAttacker().getReference());
+        if (hit(gunAttacker, gunDefender)) {
+            log.debug("Intercepted Gun #" + gunAttacker.getReference() + " Attacker #" + gunAttacker.getAttacker().getReference());
+            onHit.accept(this);
             playExplosionSong();
-            if (gun.getTransition() != null) {
-                gun.getTransition().stop();
+            if (gunAttacker.getTransition() != null) {
+                gunAttacker.getTransition().stop();
             }
-            if (defenderGun.getTimeline() != null) {
-                defenderGun.getTimeline().stop();
+            if (gunDefender.getTimeline() != null) {
+                gunDefender.getTimeline().stop();
             }
-            world.getChildren().remove(gun);
-            world.getChildren().remove(defenderGun);
-            movingGuns.remove(gun);
+            world.getChildren().remove(gunAttacker);
+            world.getChildren().remove(gunDefender);
+            movingGuns.remove(gunAttacker);
             consumer.accept(this);
             return;
         }
-        if (gun.getTranslateX() > defenderGun.getTranslateX()) {
-            defenderGun.setTranslateX(defenderGun.getTranslateX() + 1);
-            if (gun.getTranslateY() > defenderGun.getTranslateY()) {
-                defenderGun.setTranslateY(defenderGun.getTranslateY() + 1);
-            } else if (gun.getTranslateY() < defenderGun.getTranslateY()) {
-                defenderGun.setTranslateY(defenderGun.getTranslateY() - 1);
+        if (gunAttacker.getTranslateX() > gunDefender.getTranslateX()) {
+            gunDefender.setTranslateX(gunDefender.getTranslateX() + 1);
+            if (gunAttacker.getTranslateY() > gunDefender.getTranslateY()) {
+                gunDefender.setTranslateY(gunDefender.getTranslateY() + 1);
+            } else if (gunAttacker.getTranslateY() < gunDefender.getTranslateY()) {
+                gunDefender.setTranslateY(gunDefender.getTranslateY() - 1);
             }
-            if (gun.getTranslateZ() > defenderGun.getTranslateZ()) {
-                defenderGun.setTranslateZ(defenderGun.getTranslateZ() + 1);
-            } else if (gun.getTranslateZ() < defenderGun.getTranslateZ()) {
-                defenderGun.setTranslateZ(defenderGun.getTranslateZ() - 1);
+            if (gunAttacker.getTranslateZ() > gunDefender.getTranslateZ()) {
+                gunDefender.setTranslateZ(gunDefender.getTranslateZ() + 1);
+            } else if (gunAttacker.getTranslateZ() < gunDefender.getTranslateZ()) {
+                gunDefender.setTranslateZ(gunDefender.getTranslateZ() - 1);
             }
         } else {
-            defenderGun.setTranslateX(defenderGun.getTranslateX() + 1);
-            defenderGun.setTranslateY(defenderGun.getTranslateY() - 1);
-            defenderGun.setTranslateZ(defenderGun.getTranslateZ() + 1);
+            gunDefender.setTranslateX(gunDefender.getTranslateX() + 1);
+            gunDefender.setTranslateY(gunDefender.getTranslateY() - 1);
+            gunDefender.setTranslateZ(gunDefender.getTranslateZ() + 1);
         }
     }
     
-    private boolean hit(GunAttacker gun, GunDefender defenderGun) {
-        return hit(defenderGun.getTranslateX(), gun.getTranslateX())
-                && hit(defenderGun.getTranslateY(), gun.getTranslateY())
-                && hit(defenderGun.getTranslateZ(), gun.getTranslateZ());
+    private boolean hit(GunAttacker gunAttacker, GunDefender gunDefender) {
+        return hit(gunDefender.getTranslateX(), gunAttacker.getTranslateX())
+                && hit(gunDefender.getTranslateY(), gunAttacker.getTranslateY())
+                && hit(gunDefender.getTranslateZ(), gunAttacker.getTranslateZ());
     }
     
-    private boolean hit(double translateGun, double translateDefenderGun) {
-        double minMargin = translateGun - 5;
-        double maxMargin = translateGun + 5;
-        return translateDefenderGun >= minMargin && translateDefenderGun <= maxMargin;
+    private boolean hit(double translateGunAttacker, double translateGunDefender) {
+        double minMargin = translateGunAttacker - 5;
+        double maxMargin = translateGunAttacker + 5;
+        return translateGunDefender >= minMargin && translateGunDefender <= maxMargin;
     }
 }

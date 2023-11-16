@@ -6,14 +6,16 @@ import com.schambeck.war.building.BuildingBox;
 import com.schambeck.war.core.Ground;
 import com.schambeck.war.core.Xform;
 import com.schambeck.war.defender.DefenderBox;
+import com.schambeck.war.defender.GunDefender;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.*;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.VBox;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.AudioClip;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
 import javafx.scene.text.Font;
@@ -23,16 +25,25 @@ import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 
 import java.security.SecureRandom;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static javafx.scene.DepthTest.ENABLE;
+import static javafx.scene.control.Alert.AlertType.INFORMATION;
 import static javafx.scene.paint.Color.*;
+import static javafx.stage.Modality.WINDOW_MODAL;
+import static javafx.stage.StageStyle.TRANSPARENT;
 
 @Slf4j
 public class WarApp extends Application {
+    static final String SONG = "song/missile-firing.wav";
+    static final String EXTERNAL_FORM = Objects.requireNonNull(WarApp.class.getClassLoader().getResource(SONG)).toExternalForm();
+    static final AudioClip CLIP = new AudioClip(EXTERNAL_FORM);
     final AtomicInteger attackerIdGenerator = new AtomicInteger();
     final AtomicInteger attackerGunIdGenerator = new AtomicInteger();
     final AtomicInteger defenderIdGenerator = new AtomicInteger();
@@ -41,30 +52,36 @@ public class WarApp extends Application {
     final Group root = new Group();
     final Xform axisGroup = new Xform();
     final Xform world = new Xform();
-    final PerspectiveCamera camera = new PerspectiveCamera(false);
+    final PerspectiveCamera camera = new PerspectiveCamera(true);
+    //    final Group cameraGroup = new Group();
     final Xform cameraXform = new Xform();
     final Xform cameraXform2 = new Xform();
     final Xform cameraXform3 = new Xform();
+    final Xform scoreboardXform = new Xform();
+    CameraView cameraView = CameraView.DEFAULT;
     final Ground defendersGround = new Ground(1000, 20, 500);
     final Ground attackersGround = new Ground(50, 20, 500);
+    
     final List<AttackerBox> attackers = new ArrayList<>();
+    final List<GunAttacker> gunAttackers = new ArrayList<>();
     final List<DefenderBox> defenders = new ArrayList<>();
     final List<BuildingBox> buildings = new ArrayList<>();
     final List<BuildingBox> untouchedBuildings = new ArrayList<>();
     final List<GunAttacker> guns = new ArrayList<>();
     final List<GunAttacker> movingGuns = new ArrayList<>();
-    private static final double CAMERA_INITIAL_DISTANCE = 150;
-    private static final double CAMERA_INITIAL_X_ANGLE = -15;
-    private static final double CAMERA_INITIAL_Y_ANGLE = -15;
-    private static final double CAMERA_NEAR_CLIP = 0.1;
-    private static final double CAMERA_FAR_CLIP = 10000.0;
-    private static final double AXIS_LENGTH = 250.0;
-    private static final double CONTROL_MULTIPLIER = 0.1;
-    private static final double SHIFT_MULTIPLIER = 10.0;
-    private static final double MOUSE_SPEED = 0.1;
-    private static final double ROTATION_SPEED = 2.0;
-    private static final double TRACK_SPEED = 0.3;
-    private final SecureRandom random = new SecureRandom();
+    final List<GunDefender> gunDefenders = new ArrayList<>();
+    static final double CAMERA_INITIAL_X = 0;
+    static final double CAMERA_INITIAL_HEIGHT = -200;
+    static final double CAMERA_INITIAL_DISTANCE = -1400;
+    static final double CAMERA_NEAR_CLIP = 0.1;
+    static final double CAMERA_FAR_CLIP = 10000.0;
+    static final double AXIS_LENGTH = 1500.0;
+    static final double CONTROL_MULTIPLIER = 0.1;
+    static final double SHIFT_MULTIPLIER = 10.0;
+    static final double MOUSE_SPEED = 0.1;
+    static final double ROTATION_SPEED = 2.0;
+    static final double TRACK_SPEED = 0.3;
+    final SecureRandom random = new SecureRandom();
     
     double mousePosX;
     double mousePosY;
@@ -72,29 +89,37 @@ public class WarApp extends Application {
     double mouseOldY;
     double mouseDeltaX;
     double mouseDeltaY;
-    private Label buildingsLabel;
-    private Label gunsLabel;
-    private final Image buildingMap = new Image("image/building.jpg");
-    private final Image tankMap = new Image("image/tank.jpg");
-    private final Image defenderMap = new Image("image/defender.jpg");
-    private final Image grassMap = new Image("image/grass.jpg");
-    private final Image sandMap = new Image("image/sand.jpg");
+    Label buildingsLabel;
+    Label gunsLabel;
+    Label camerasLabel;
+    Label attackersLabel;
+    Label defendersLabel;
+    Label gunAttackerLabel;
+    Label gunDefenderLabel;
+    final Image buildingMap = new Image("image/building.jpg");
+    final Image tankMap = new Image("image/tank.jpg");
+    final Image defenderMap = new Image("image/defender.jpg");
+    final Image grassMap = new Image("image/grass.jpg");
+    final Image sandMap = new Image("image/sand.jpg");
+    VBox scoreboard;
+    Stage stage;
     
     @Override
     public void start(Stage stage) {
+        this.stage = stage;
         root.getChildren().add(world);
-        root.setDepthTest(DepthTest.ENABLE);
+        root.setDepthTest(ENABLE);
         
         buildCamera();
         buildLight();
         buildAxes();
         buildDefendersGround();
         buildAttackersGround();
-        addDefenders(2);
-        addBuildings(3, 2);
-        addAttackers(5);
+        addDefenders(4);
+        addBuildings(5, 2);
+        addAttackers(3);
         buildScoreboard();
-        play();
+        updateScoreboard();
         
         Scene scene = new Scene(root, 1024, 768, true);
         scene.setFill(GREY);
@@ -107,6 +132,7 @@ public class WarApp extends Application {
         stage.show();
         
         scene.setCamera(camera);
+        showAutocloseToastHelp(createShortcutsContent());
     }
     
     public static void main(String[] args) {
@@ -114,17 +140,37 @@ public class WarApp extends Application {
     }
     
     private void buildCamera() {
+//        cameraGroup.getChildren().add(camera);
+//        root.getChildren().add(cameraGroup);
+//        camera.setRotate(45);
+//        cameraGroup.setTranslateZ(-75);
+        
         root.getChildren().add(cameraXform);
         cameraXform.getChildren().add(cameraXform2);
         cameraXform2.getChildren().add(cameraXform3);
         cameraXform3.getChildren().add(camera);
         camera.setNearClip(CAMERA_NEAR_CLIP);
         camera.setFarClip(CAMERA_FAR_CLIP);
-        camera.setTranslateX(-700);
-        camera.setTranslateY(-450);
+        camera.setTranslateY(CAMERA_INITIAL_HEIGHT);
         camera.setTranslateZ(CAMERA_INITIAL_DISTANCE);
-        cameraXform.getRy().setAngle(CAMERA_INITIAL_Y_ANGLE);
-        cameraXform.getRx().setAngle(CAMERA_INITIAL_X_ANGLE);
+        camera.translateXProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        camera.translateYProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        camera.translateZProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform.translateXProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform.translateYProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform.translateZProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform.getRx().angleProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform.getRy().angleProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform2.translateXProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform2.translateYProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform2.translateZProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform2.getRx().angleProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform2.getRy().angleProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform3.translateXProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform3.translateYProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform3.translateZProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform3.getRx().angleProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        cameraXform3.getRy().angleProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
     }
     
     private void buildLight() {
@@ -150,23 +196,23 @@ public class WarApp extends Application {
         final PhongMaterial redMaterial = new PhongMaterial();
         redMaterial.setDiffuseColor(DARKRED);
         redMaterial.setSpecularColor(RED);
-
+        
         final PhongMaterial greenMaterial = new PhongMaterial();
         greenMaterial.setDiffuseColor(DARKGREEN);
         greenMaterial.setSpecularColor(GREEN);
-
+        
         final PhongMaterial blueMaterial = new PhongMaterial();
         blueMaterial.setDiffuseColor(DARKBLUE);
         blueMaterial.setSpecularColor(BLUE);
-
+        
         final Box xAxis = new Box(AXIS_LENGTH, 1, 1);
         final Box yAxis = new Box(1, AXIS_LENGTH, 1);
         final Box zAxis = new Box(1, 1, AXIS_LENGTH);
-
+        
         xAxis.setMaterial(redMaterial);
         yAxis.setMaterial(greenMaterial);
         zAxis.setMaterial(blueMaterial);
-
+        
         axisGroup.getChildren().addAll(xAxis, yAxis, zAxis);
         axisGroup.setVisible(false);
         world.getChildren().addAll(axisGroup);
@@ -197,7 +243,7 @@ public class WarApp extends Application {
         PhongMaterial selectedMaterial = new PhongMaterial();
         selectedMaterial.setDiffuseColor(MAGENTA);
         selectedMaterial.setSpecularColor(DARKMAGENTA);
-        DefenderBox defender = new DefenderBox(40, 20, 20, o -> updateScoreboard(), movingGuns, defenderIdGenerator.incrementAndGet(), defenderGunIdGenerator);
+        DefenderBox defender = new DefenderBox(40, 20, 20, node -> updateScoreboard(), node -> resetCamera(), movingGuns, defenderIdGenerator.incrementAndGet(), defenderGunIdGenerator, camera, gunDefenders);
         defender.setMaterial(magentaMaterial);
         defender.setTranslateX((((defendersGround.getWidth() / 2) - (defender.getWidth() * 4)) * -1) + 20);
         defender.setTranslateY(((defendersGround.getHeight() / 2) + (defender.getHeight() / 2)) * -1);
@@ -213,14 +259,14 @@ public class WarApp extends Application {
         label.setTranslateY((box.getTranslateY() - box.getHeight() - 10));
         return createLabel(label, box, selectedMaterial, magentaMaterial);
     }
-
+    
     private <T extends Box> Label createAttackerLabel(String prefix, T box, PhongMaterial selectedMaterial, PhongMaterial magentaMaterial, Integer reference) {
-        Label label = new Label(prefix + " #" + reference);
+        Label label = new Label(prefix + " #" + reference + " ");
         label.setTranslateX((box.getTranslateX() - 10));
         label.setTranslateY((box.getTranslateY() - box.getLayoutBounds().getHeight() - 10));
         return createLabel(label, box, selectedMaterial, magentaMaterial);
     }
-
+    
     private <T extends Box> Label createLabel(Label label, T box, PhongMaterial selectedMaterial, PhongMaterial magentaMaterial) {
         label.setTranslateZ((box.getTranslateZ()));
         label.setVisible(false);
@@ -268,24 +314,50 @@ public class WarApp extends Application {
         selectedMaterial.setSpecularColor(DARKRED);
         AttackerBox attacker = new AttackerBox(40, 20, 20, o -> updateScoreboard(), attackerIdGenerator.incrementAndGet(), attackerGunIdGenerator);
         attacker.setMaterial(redMaterial);
-        attacker.setTranslateX(attackersGround.getTranslateX());
-        attacker.setTranslateY(((defendersGround.getHeight() / 2) + (attacker.getHeight() / 2)) * -1);
-        attacker.setTranslateZ((defendersGround.getDepth() / 2 * -1) + (defendersGround.getDepth() / (count + 1) * (attackers.size() + 1)));
+        double translateX = attackersGround.getTranslateX();
+        attacker.setTranslateX(translateX);
+        double translateY = ((defendersGround.getHeight() / 2) + (attacker.getHeight() / 2)) * -1;
+        attacker.setTranslateY(translateY);
+        double translateZ = (defendersGround.getDepth() / 2 * -1) + (defendersGround.getDepth() / (count + 1) * (attackers.size() + 1));
+        attacker.setTranslateZ(translateZ);
         attackers.add(attacker);
         Label label = createAttackerLabel("Attacker", attacker, selectedMaterial, redMaterial, attacker.getReference());
         world.getChildren().addAll(attacker, label);
+        attacker.translateXProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        attacker.translateYProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        attacker.translateZProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
     }
     
     private void buildScoreboard() {
         buildingsLabel = new Label("Buildings: " + buildings.size());
         buildingsLabel.setFont(Font.font("Courier New", FontWeight.BOLD, 30));
+        
         gunsLabel = new Label("Guns: " + movingGuns.size());
         gunsLabel.setFont(Font.font("Courier New", FontWeight.BOLD, 30));
-        VBox scoreboard = new VBox(buildingsLabel, gunsLabel);
-        scoreboard.setTranslateX(300);
-        scoreboard.setTranslateY((scoreboard.getHeight() + 100) * -1);
+        
+        camerasLabel = new Label();
+        camerasLabel.setFont(Font.font("Courier New", FontWeight.BOLD, 30));
+        
+        attackersLabel = new Label();
+        attackersLabel.setFont(Font.font("Courier New", FontWeight.BOLD, 30));
+        
+        defendersLabel = new Label();
+        defendersLabel.setFont(Font.font("Courier New", FontWeight.BOLD, 30));
+        
+        gunAttackerLabel = new Label();
+        gunAttackerLabel.setFont(Font.font("Courier New", FontWeight.BOLD, 30));
+        
+        gunDefenderLabel = new Label();
+        gunDefenderLabel.setFont(Font.font("Courier New", FontWeight.BOLD, 30));
+        
+        scoreboard = new VBox(camerasLabel, gunAttackerLabel, gunDefenderLabel);
+        scoreboard.setVisible(false);
+        scoreboard.setTranslateX(-800);
+        scoreboard.setTranslateY((scoreboard.getHeight() + 600) * -1);
         scoreboard.setTranslateZ(attackersGround.getDepth() / 2);
-        root.getChildren().add(scoreboard);
+        
+        scoreboardXform.getChildren().add(scoreboard);
+        root.getChildren().add(scoreboardXform);
     }
     
     private void play() {
@@ -299,21 +371,22 @@ public class WarApp extends Application {
         }
         AttackerBox attacker = attackers.get(getRandomAttacker());
         BuildingBox building = untouchedBuildings.get(getRandomBuilding());
-        GunAttacker gun = attacker.shoot(world, building, guns, movingGuns, untouchedBuildings);
+        GunAttacker gun = attacker.shoot(world, building, guns, movingGuns, untouchedBuildings, camera, cameraView);
+        gun.translateXProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        gun.translateYProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        gun.translateZProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        gun.rotateProperty().addListener((observable, oldValue, newValue) -> updateScoreboard());
+        gunAttackers.add(gun);
+        
         playShootSong();
         if (!defenders.isEmpty()) {
             DefenderBox defender = defenders.get(getRandomDefender());
-            defender.defend(world, gun);
+            defender.defend(world, gun, cameraView);
         }
     }
     
     private void playShootSong() {
-        String song = "song/missile-firing.wav";
-        log.debug("Playing shoot: " + song);
-        String externalForm = Objects.requireNonNull(getClass().getClassLoader().getResource(song)).toExternalForm();
-        Media hit = new Media(externalForm);
-        MediaPlayer mediaPlayer = new MediaPlayer(hit);
-        mediaPlayer.play();
+        CLIP.play();
     }
     
     private int getRandomDefender() {
@@ -337,21 +410,45 @@ public class WarApp extends Application {
     private void handleKeyboard(Scene scene) {
         scene.setOnKeyPressed(event -> {
             switch (event.getCode()) {
+                case F1:
+                    showHelp(event);
+                    break;
+                case DIGIT0:
+                    cameraView = CameraView.DEFAULT;
+                    changeCameraView();
+                    break;
+                case DIGIT1:
+                    cameraView = CameraView.DEFAULT_ATTACKER_GUN;
+                    changeCameraView();
+                    break;
+                case DIGIT2:
+                    cameraView = CameraView.DEFAULT_DEFENDER_GUN;
+                    changeCameraView();
+                    break;
+                case DIGIT3:
+                    cameraView = CameraView.ATTACKER_GUN;
+                    changeCameraView();
+                    break;
+                case DIGIT4:
+                    cameraView = CameraView.DEFENDER_GUN;
+                    changeCameraView();
+                    break;
                 case Z:
-                    cameraXform2.getT().setX(0.0);
-                    cameraXform2.getT().setY(0.0);
-                    camera.setTranslateZ(CAMERA_INITIAL_DISTANCE);
-                    cameraXform.getRy().setAngle(CAMERA_INITIAL_Y_ANGLE);
-                    cameraXform.getRx().setAngle(CAMERA_INITIAL_X_ANGLE);
+                    resetCamera();
+                    world.setRotate(0);
                     break;
                 case X:
                     axisGroup.setVisible(!axisGroup.isVisible());
                     break;
                 case V:
-                    defendersGround.setVisible(!defendersGround.isVisible());
+                    scoreboard.setVisible(!scoreboard.isVisible());
                     break;
                 case R:
-                    world.setRotate(world.getRotate() + 1);
+                    if (event.isShiftDown()) {
+                        world.setRotate(world.getRotate() - 1);
+                    } else {
+                        world.setRotate(world.getRotate() + 1);
+                    }
                     break;
                 case P:
                     play();
@@ -369,7 +466,7 @@ public class WarApp extends Application {
                     if (event.isShiftDown()) {
                         cameraXform.getRx().setAngle(cameraXform.getRx().getAngle() + 10);
                     } else if (event.isControlDown()) {
-                        camera.setTranslateZ(camera.getTranslateY() + 10);
+                        camera.setTranslateZ(camera.getTranslateZ() - 10);
                     } else {
                         camera.setTranslateY(camera.getTranslateY() + 10);
                     }
@@ -390,6 +487,90 @@ public class WarApp extends Application {
                     break;
             }
         });
+    }
+    
+    private void showHelp(KeyEvent event) {
+        String content = createShortcutsContent();
+        if (event.isShiftDown()) {
+            showAlertHelp(content);
+        } else {
+            showToastHelp(content);
+        }
+    }
+    
+    private void showToastHelp(String content) {
+        createToast("Shortcuts:\n\n" + content);
+    }
+    
+    private void showAutocloseToastHelp(String content) {
+        createToastAutoclose("Shortcuts:\n\n" + content);
+    }
+    
+    private static void showAlertHelp(String content) {
+        Alert alert = new Alert(INFORMATION);
+        alert.initModality(WINDOW_MODAL);
+        alert.initStyle(TRANSPARENT);
+        alert.setTitle("Help");
+        alert.setHeaderText("Shortcuts");
+        Label label = new Label(content);
+        alert.getDialogPane().setContent(label);
+        alert.getDialogPane().getContent().setStyle("-fx-font-family: 'Courier New';");
+        alert.showAndWait();
+    }
+    
+    private static String createShortcutsContent() {
+        return "  F1 - Show Toast Help             | SHIFT+F1 - Show Alert Help\n" +
+                "   0 - CameraView.DEFAULT          |        P - Play\n" +
+                "   1 - CameraView.DEFAULT_ATTACKER |        R - Rotate\n" +
+                "   2 - CameraView.DEFAULT_DEFENDER |        V - Show Scoreboard\n" +
+                "   3 - CameraView.ATTACKER         |        X - Show Axis\n" +
+                "   4 - CameraView.DEFENDER         |        Z - Reset Camera\n\n" +
+                "  UP - Move Camera UP              |     DOWN - Move Camera DOWN\n" +
+                "LEFT - Move Camera LEFT            |    RIGHT - Move Camera RIGHT";
+    }
+    
+    private void changeCameraView() {
+        log.debug("CameraView: {}", cameraView);
+        createToastAutoclose("CameraView: ".concat(cameraView.name()));
+        resetCamera();
+    }
+    
+    private void createToast(String toastMsg) {
+        int fadeInTime = 500;
+        Toast.makeText(stage, toastMsg, null, fadeInTime, null);
+    }
+    
+    private void createToastAutoclose(String toastMsg) {
+        int toastMsgTime = 2000;
+        int fadeInTime = 500;
+        int fadeOutTime = 500;
+        Toast.makeText(stage, toastMsg, toastMsgTime, fadeInTime, fadeOutTime);
+    }
+    
+    private void resetCamera() {
+        cameraXform2.getT().setX(0.0);
+        cameraXform2.getT().setY(0.0);
+        camera.setTranslateX(CAMERA_INITIAL_X);
+        camera.setTranslateY(CAMERA_INITIAL_HEIGHT);
+        camera.setTranslateZ(CAMERA_INITIAL_DISTANCE);
+        cameraXform.getRx().setAngle(0);
+        cameraXform.getRy().setAngle(0);
+        switch (cameraView) {
+            case DEFAULT:
+            case DEFAULT_ATTACKER_GUN:
+            case DEFAULT_DEFENDER_GUN:
+                cameraXform.getRy().setAngle(0);
+                scoreboardXform.getRy().setAngle(0);
+                break;
+            case ATTACKER_GUN:
+                cameraXform.getRy().setAngle(-84);
+                scoreboardXform.getRy().setAngle(-90);
+                break;
+            case DEFENDER_GUN:
+                cameraXform.getRy().setAngle(84);
+                scoreboardXform.getRy().setAngle(90);
+                break;
+        }
     }
     
     private void handleMouse(Scene scene) {
@@ -416,17 +597,15 @@ public class WarApp extends Application {
                 modifier = SHIFT_MULTIPLIER;
             }
             if (me.isPrimaryButtonDown()) {
-                cameraXform.getRy().setAngle(cameraXform.getRy().getAngle() - mouseDeltaX*MOUSE_SPEED*modifier*ROTATION_SPEED);
-                cameraXform.getRx().setAngle(cameraXform.getRx().getAngle() + mouseDeltaY*MOUSE_SPEED*modifier*ROTATION_SPEED);
-            }
-            else if (me.isSecondaryButtonDown()) {
+                cameraXform.getRy().setAngle(cameraXform.getRy().getAngle() - mouseDeltaX * MOUSE_SPEED * modifier * ROTATION_SPEED);
+                cameraXform.getRx().setAngle(cameraXform.getRx().getAngle() + mouseDeltaY * MOUSE_SPEED * modifier * ROTATION_SPEED);
+            } else if (me.isSecondaryButtonDown()) {
                 double z = camera.getTranslateZ();
-                double newZ = z + mouseDeltaX*MOUSE_SPEED*modifier;
+                double newZ = z + mouseDeltaX * MOUSE_SPEED * modifier;
                 camera.setTranslateZ(newZ);
-            }
-            else if (me.isMiddleButtonDown()) {
-                cameraXform2.getT().setX(cameraXform2.getT().getX() + mouseDeltaX*MOUSE_SPEED*modifier*TRACK_SPEED);
-                cameraXform2.getT().setY(cameraXform2.getT().getY() + mouseDeltaY*MOUSE_SPEED*modifier*TRACK_SPEED);
+            } else if (me.isMiddleButtonDown()) {
+                cameraXform2.getT().setX(cameraXform2.getT().getX() + mouseDeltaX * MOUSE_SPEED * modifier * TRACK_SPEED);
+                cameraXform2.getT().setY(cameraXform2.getT().getY() + mouseDeltaY * MOUSE_SPEED * modifier * TRACK_SPEED);
             }
         });
     }
@@ -435,6 +614,15 @@ public class WarApp extends Application {
         Platform.runLater(() -> {
             buildingsLabel.setText("Buildings: " + untouchedBuildings.size());
             gunsLabel.setText("Guns: " + movingGuns.size());
+            camerasLabel.setText("Camera          = X: " + DecimalFormat.getInstance().format(camera.getTranslateX()) + " Y: " + DecimalFormat.getInstance().format(camera.getTranslateY()) + " Z: " + DecimalFormat.getInstance().format(camera.getTranslateZ()) + " R: " + DecimalFormat.getInstance().format(camera.getRotate()) + "\n" + "CameraXform     = X: " + DecimalFormat.getInstance().format(cameraXform.getTranslateX()) + " Y: " + DecimalFormat.getInstance().format(cameraXform.getTranslateY()) + " Z: " + DecimalFormat.getInstance().format(cameraXform.getTranslateZ()) + " R: " + cameraXform.getRotate() + " AX: " + cameraXform.getRx().getAngle() + " AY: " + cameraXform.getRy().getAngle() + "\n" + "CameraXform2    = X: " + DecimalFormat.getInstance().format(cameraXform2.getTranslateX()) + " Y: " + DecimalFormat.getInstance().format(cameraXform2.getTranslateY()) + " Z: " + DecimalFormat.getInstance().format(cameraXform2.getTranslateZ()) + " R: " + cameraXform2.getRotate() + " AX: " + DecimalFormat.getInstance().format(cameraXform2.getRx().getAngle()) + " AY: " + DecimalFormat.getInstance().format(cameraXform2.getRy().getAngle()) + "\n" + "CameraXform3    = X: " + DecimalFormat.getInstance().format(cameraXform3.getTranslateX()) + " Y: " + cameraXform3.getTranslateY() + " Z: " + cameraXform3.getTranslateZ() + " R: " + cameraXform3.getRotate() + " AX: " + cameraXform3.getRx().getAngle() + " AY: " + cameraXform3.getRy().getAngle());
+            String defendersText = defenders.stream().map(defender -> "Defender #" + defender.getReference() + "     = X: " + DecimalFormat.getInstance().format(defender.getTranslateX()) + " Y: " + DecimalFormat.getInstance().format(defender.getTranslateY()) + " Z: " + DecimalFormat.getInstance().format(defender.getTranslateZ()) + " R: " + DecimalFormat.getInstance().format(defender.getRotate())).collect(Collectors.joining("\n"));
+            defendersLabel.setText(defendersText);
+            String attackersText = attackers.stream().map(attacker -> "Attacker #" + attacker.getReference() + "     = X: " + DecimalFormat.getInstance().format(attacker.getTranslateX()) + " Y: " + DecimalFormat.getInstance().format(attacker.getTranslateY()) + " Z: " + DecimalFormat.getInstance().format(attacker.getTranslateZ()) + " R: " + DecimalFormat.getInstance().format(attacker.getRotate())).collect(Collectors.joining("\n"));
+            attackersLabel.setText(attackersText);
+            String gunDefenderText = gunDefenders.stream().map(defender -> "GunDefender #" + defender.getReference() + "  = X: " + DecimalFormat.getInstance().format(defender.getTranslateX()) + " Y: " + DecimalFormat.getInstance().format(defender.getTranslateY()) + " Z: " + DecimalFormat.getInstance().format(defender.getTranslateZ()) + " R: " + DecimalFormat.getInstance().format(defender.getRotate())).collect(Collectors.joining("\n"));
+            gunDefenderLabel.setText(gunDefenderText);
+            String gunAttackerText = guns.stream().map(attacker -> "GunAttacker #" + attacker.getReference() + "  = X: " + DecimalFormat.getInstance().format(attacker.getTranslateX()) + " Y: " + DecimalFormat.getInstance().format(attacker.getTranslateY()) + " Z: " + DecimalFormat.getInstance().format(attacker.getTranslateZ()) + " R: " + DecimalFormat.getInstance().format(attacker.getRotate())).collect(Collectors.joining("\n"));
+            gunAttackerLabel.setText(gunAttackerText);
         });
     }
 }

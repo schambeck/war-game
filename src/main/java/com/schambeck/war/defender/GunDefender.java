@@ -15,6 +15,5 @@ public class GunDefender extends Cylinder {
         super(radius, height);
         this.defender = defender;
         this.reference = reference;
-        
     }
 }
